@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Social Platform</title>
-    <!-- 引入现代化UI框架 -->
-    <link href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.0.0-beta.83/dist/themes/light.css" rel="stylesheet">
-    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.0.0-beta.83/dist/shoelace.js"></script>
+    <title>纯文字社交平台</title>
+    <!-- 引入UI框架 -->
+    <link href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.0.0/dist/themes/light.css" rel="stylesheet">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.0.0/dist/shoelace.js"></script>
     
     <style>
         :root {
-            --primary-color: #6366f1;
-            --background: #f3f4f6;
+            --primary-color: #3b82f6;
+            --background: #f8fafc;
         }
 
         body {
@@ -22,7 +22,7 @@
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 800px;
             margin: 0 auto;
         }
 
@@ -31,7 +31,7 @@
             border-radius: 12px;
             padding: 1.5rem;
             margin: 1rem 0;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
             transition: transform 0.2s;
         }
 
@@ -39,182 +39,168 @@
             transform: translateY(-2px);
         }
 
-        .upload-section {
-            background: white;
-            padding: 2rem;
-            border-radius: 12px;
-            margin-bottom: 2rem;
-        }
-
-        #previewContainer {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 1rem;
+        .post-content {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            color: #334155;
             margin: 1rem 0;
         }
 
-        .preview-item {
-            position: relative;
-            border-radius: 8px;
-            overflow: hidden;
+        .search-box {
+            width: 100%;
+            max-width: 400px;
+            margin: 1rem 0;
         }
 
-        .preview-item video, .preview-item img {
-            width: 100%;
-            height: 200px;
-            object-fit: cover;
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #64748b;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- 头部导航 -->
+        <!-- 头部 -->
         <sl-card class="header">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h1>Social Platform</h1>
-                <sl-input placeholder="搜索帖子..." id="searchInput" style="width: 300px;"></sl-input>
+                <h1 style="margin: 0;">文字社交平台</h1>
+                <sl-input class="search-box" placeholder="搜索内容..." id="searchInput"></sl-input>
             </div>
         </sl-card>
 
         <!-- 发布区域 -->
-        <sl-card class="upload-section">
+        <sl-card style="margin-bottom: 2rem;">
             <sl-textarea id="postContent" placeholder="分享你的想法..." rows="3"></sl-textarea>
-            
-            <div style="margin: 1rem 0;">
-                <sl-button variant="default" id="uploadImageBtn">
-                    <sl-icon name="image"></sl-icon> 上传图片
-                </sl-button>
-                <sl-button variant="default" id="uploadVideoBtn">
-                    <sl-icon name="film"></sl-icon> 上传视频
-                </sl-button>
-                <input type="file" id="imageInput" hidden accept="image/*">
-                <input type="file" id="videoInput" hidden accept="video/*">
-            </div>
-
-            <div id="previewContainer"></div>
-            
-            <sl-button variant="primary" id="postBtn" style="width: 100%;">
+            <sl-button variant="primary" id="postBtn" style="margin-top: 1rem; width: 100%;">
                 发布动态
             </sl-button>
         </sl-card>
 
         <!-- 动态展示区 -->
-        <div id="postsContainer"></div>
+        <div id="postsContainer" class="loading">加载中...</div>
     </div>
 
-    <script>
-        // 数据存储（实际项目应使用Firebase等后端服务）
-        let posts = JSON.parse(localStorage.getItem('posts')) || [];
-        
-        // 上传文件处理
-        const handleFileUpload = (file, isVideo = false) => {
-            return new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const preview = document.createElement(isVideo ? 'video' : 'img');
-                    preview.src = e.target.result;
-                    preview.controls = isVideo;
-                    const wrapper = document.createElement('div');
-                    wrapper.className = 'preview-item';
-                    wrapper.appendChild(preview);
-                    document.getElementById('previewContainer').appendChild(wrapper);
-                    resolve(e.target.result);
-                };
-                reader.readAsDataURL(file);
-            });
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+        import { 
+            getFirestore, collection, addDoc, query, 
+            orderBy, onSnapshot, updateDoc, doc 
+        } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+          apiKey: "AIzaSyC12z7Xg6hbOZqq_AOyZ6djEhZAYTxHTbY",
+          authDomain: "futalk-b3245.firebaseapp.com",
+          projectId: "futalk-b3245",
+          storageBucket: "futalk-b3245.firebasestorage.app",
+          messagingSenderId: "458769584283",
+          appId: "1:458769584283:web:0dfa246b5f22e891f8f63e",
         };
 
+        // 初始化Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // 元素引用
+        const postContent = document.getElementById('postContent');
+        const postBtn = document.getElementById('postBtn');
+
         // 发布动态
-        document.getElementById('postBtn').addEventListener('click', () => {
-            const content = document.getElementById('postContent').value;
-            const media = [...document.querySelectorAll('#previewContainer video, #previewContainer img')]
-                .map(el => ({ type: el.tagName.toLowerCase(), src: el.src }));
+        postBtn.addEventListener('click', async () => {
+            const content = postContent.value.trim();
+            if (!content) return;
 
-            if (!content && media.length === 0) return;
-
-            const newPost = {
-                id: Date.now(),
-                content,
-                media,
-                likes: 0,
-                timestamp: new Date().toISOString()
-            };
-
-            posts.unshift(newPost);
-            localStorage.setItem('posts', JSON.stringify(posts));
-            renderPosts();
-            clearForm();
+            try {
+                await addDoc(collection(db, "posts"), {
+                    content,
+                    likes: 0,
+                    createdAt: new Date().toISOString()
+                });
+                postContent.value = '';
+            } catch (error) {
+                console.error("发布失败:", error);
+            }
         });
 
-        // 渲染动态
-        const renderPosts = () => {
-            const container = document.getElementById('postsContainer');
-            container.innerHTML = '';
+        // 实时获取动态
+        const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
+        onSnapshot(q, (snapshot) => {
+            const postsContainer = document.getElementById('postsContainer');
+            postsContainer.innerHTML = '';
             
-            // 随机推荐算法
-            const shuffledPosts = [...posts].sort(() => Math.random() - 0.5);
-            
+            if (snapshot.empty) {
+                postsContainer.innerHTML = '<div class="post-card">还没有动态，快来发布第一个吧！</div>';
+                return;
+            }
+
+            // 随机排序
+            const posts = [];
+            snapshot.forEach(doc => posts.push({ id: doc.id, ...doc.data() }));
+            const shuffledPosts = posts.sort(() => Math.random() - 0.5);
+
             shuffledPosts.forEach(post => {
                 const card = document.createElement('sl-card');
                 card.className = 'post-card';
-                
-                let mediaHTML = '';
-                post.media.forEach(media => {
-                    mediaHTML += media.type === 'img' ?
-                        `<img src="${media.src}" style="max-width: 100%; margin: 1rem 0;">` :
-                        `<video src="${media.src}" controls style="max-width: 100%; margin: 1rem 0;"></video>`;
-                });
-
                 card.innerHTML = `
-                    <div style="color: #666; font-size: 0.9rem;">
-                        ${new Date(post.timestamp).toLocaleString()}
+                    <div style="color: #64748b; font-size: 0.875rem; margin-bottom: 0.5rem;">
+                        ${new Date(post.createdAt).toLocaleString()}
                     </div>
-                    <p>${post.content}</p>
-                    ${mediaHTML}
-                    <sl-button variant="text" onclick="handleLike(${post.id})">
-                        <sl-icon name="heart"></sl-icon> ${post.likes}
-                    </sl-button>
+                    <div class="post-content">${post.content}</div>
+                    <div style="margin-top: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <sl-button variant="text" size="small" id="like-${post.id}">
+                            <sl-icon name="heart"></sl-icon> ${post.likes}
+                        </sl-button>
+                    </div>
                 `;
-                container.appendChild(card);
+                postsContainer.appendChild(card);
+
+                // 点赞功能
+                const likeBtn = document.getElementById(`like-${post.id}`);
+                likeBtn.addEventListener('click', async () => {
+                    try {
+                        await updateDoc(doc(db, "posts", post.id), {
+                            likes: post.likes + 1
+                        });
+                    } catch (error) {
+                        console.error("点赞失败:", error);
+                    }
+                });
             });
-        };
+        });
 
         // 搜索功能
-        document.getElementById('searchInput').addEventListener('input', (e) => {
+        document.getElementById('searchInput').addEventListener('input', async (e) => {
             const keyword = e.target.value.toLowerCase();
-            const filtered = posts.filter(post => 
-                post.content.toLowerCase().includes(keyword) ||
-                post.media.some(media => media.src.toLowerCase().includes(keyword))
-            );
+            const snapshot = await getDocs(collection(db, "posts"));
+            const filtered = snapshot.docs
+                .filter(doc => doc.data().content.toLowerCase().includes(keyword))
+                .map(doc => ({ id: doc.id, ...doc.data() }));
+            
             renderPosts(filtered);
         });
 
-        // 初始化
-        document.getElementById('uploadImageBtn').addEventListener('click', () => 
-            document.getElementById('imageInput').click()
-        );
-        document.getElementById('uploadVideoBtn').addEventListener('click', () => 
-            document.getElementById('videoInput').click()
-        );
-
-        document.getElementById('imageInput').addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (file) await handleFileUpload(file);
-        });
-
-        document.getElementById('videoInput').addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (file) await handleFileUpload(file, true);
-        });
-
-        // 清空表单
-        const clearForm = () => {
-            document.getElementById('postContent').value = '';
-            document.getElementById('previewContainer').innerHTML = '';
-        };
-
-        // 初始化渲染
-        renderPosts();
+        function renderPosts(posts) {
+            const container = document.getElementById('postsContainer');
+            container.innerHTML = '';
+            
+            (posts || []).forEach(post => {
+                const card = document.createElement('sl-card');
+                card.className = 'post-card';
+                card.innerHTML = `
+                    <div style="color: #64748b; font-size: 0.875rem; margin-bottom: 0.5rem;">
+                        ${new Date(post.createdAt).toLocaleString()}
+                    </div>
+                    <div class="post-content">${post.content}</div>
+                    <div style="margin-top: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <sl-button variant="text" size="small" id="like-${post.id}">
+                            <sl-icon name="heart"></sl-icon> ${post.likes}
+                        </sl-button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
     </script>
 </body>
 </html>
