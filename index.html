@@ -1,1 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Social Platform</title>
+    <!-- 引入现代化UI框架 -->
+    <link href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.0.0-beta.83/dist/themes/light.css" rel="stylesheet">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.0.0-beta.83/dist/shoelace.js"></script>
+    
+    <style>
+        :root {
+            --primary-color: #6366f1;
+            --background: #f3f4f6;
+        }
 
+        body {
+            font-family: 'Segoe UI', system-ui;
+            background: var(--background);
+            margin: 0;
+            padding: 1rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .post-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+
+        .post-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .upload-section {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+        }
+
+        #previewContainer {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .preview-item {
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .preview-item video, .preview-item img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 头部导航 -->
+        <sl-card class="header">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h1>Social Platform</h1>
+                <sl-input placeholder="搜索帖子..." id="searchInput" style="width: 300px;"></sl-input>
+            </div>
+        </sl-card>
+
+        <!-- 发布区域 -->
+        <sl-card class="upload-section">
+            <sl-textarea id="postContent" placeholder="分享你的想法..." rows="3"></sl-textarea>
+            
+            <div style="margin: 1rem 0;">
+                <sl-button variant="default" id="uploadImageBtn">
+                    <sl-icon name="image"></sl-icon> 上传图片
+                </sl-button>
+                <sl-button variant="default" id="uploadVideoBtn">
+                    <sl-icon name="film"></sl-icon> 上传视频
+                </sl-button>
+                <input type="file" id="imageInput" hidden accept="image/*">
+                <input type="file" id="videoInput" hidden accept="video/*">
+            </div>
+
+            <div id="previewContainer"></div>
+            
+            <sl-button variant="primary" id="postBtn" style="width: 100%;">
+                发布动态
+            </sl-button>
+        </sl-card>
+
+        <!-- 动态展示区 -->
+        <div id="postsContainer"></div>
+    </div>
+
+    <script>
+        // 数据存储（实际项目应使用Firebase等后端服务）
+        let posts = JSON.parse(localStorage.getItem('posts')) || [];
+        
+        // 上传文件处理
+        const handleFileUpload = (file, isVideo = false) => {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const preview = document.createElement(isVideo ? 'video' : 'img');
+                    preview.src = e.target.result;
+                    preview.controls = isVideo;
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'preview-item';
+                    wrapper.appendChild(preview);
+                    document.getElementById('previewContainer').appendChild(wrapper);
+                    resolve(e.target.result);
+                };
+                reader.readAsDataURL(file);
+            });
+        };
+
+        // 发布动态
+        document.getElementById('postBtn').addEventListener('click', () => {
+            const content = document.getElementById('postContent').value;
+            const media = [...document.querySelectorAll('#previewContainer video, #previewContainer img')]
+                .map(el => ({ type: el.tagName.toLowerCase(), src: el.src }));
+
+            if (!content && media.length === 0) return;
+
+            const newPost = {
+                id: Date.now(),
+                content,
+                media,
+                likes: 0,
+                timestamp: new Date().toISOString()
+            };
+
+            posts.unshift(newPost);
+            localStorage.setItem('posts', JSON.stringify(posts));
+            renderPosts();
+            clearForm();
+        });
+
+        // 渲染动态
+        const renderPosts = () => {
+            const container = document.getElementById('postsContainer');
+            container.innerHTML = '';
+            
+            // 随机推荐算法
+            const shuffledPosts = [...posts].sort(() => Math.random() - 0.5);
+            
+            shuffledPosts.forEach(post => {
+                const card = document.createElement('sl-card');
+                card.className = 'post-card';
+                
+                let mediaHTML = '';
+                post.media.forEach(media => {
+                    mediaHTML += media.type === 'img' ?
+                        `<img src="${media.src}" style="max-width: 100%; margin: 1rem 0;">` :
+                        `<video src="${media.src}" controls style="max-width: 100%; margin: 1rem 0;"></video>`;
+                });
+
+                card.innerHTML = `
+                    <div style="color: #666; font-size: 0.9rem;">
+                        ${new Date(post.timestamp).toLocaleString()}
+                    </div>
+                    <p>${post.content}</p>
+                    ${mediaHTML}
+                    <sl-button variant="text" onclick="handleLike(${post.id})">
+                        <sl-icon name="heart"></sl-icon> ${post.likes}
+                    </sl-button>
+                `;
+                container.appendChild(card);
+            });
+        };
+
+        // 搜索功能
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            const keyword = e.target.value.toLowerCase();
+            const filtered = posts.filter(post => 
+                post.content.toLowerCase().includes(keyword) ||
+                post.media.some(media => media.src.toLowerCase().includes(keyword))
+            );
+            renderPosts(filtered);
+        });
+
+        // 初始化
+        document.getElementById('uploadImageBtn').addEventListener('click', () => 
+            document.getElementById('imageInput').click()
+        );
+        document.getElementById('uploadVideoBtn').addEventListener('click', () => 
+            document.getElementById('videoInput').click()
+        );
+
+        document.getElementById('imageInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file) await handleFileUpload(file);
+        });
+
+        document.getElementById('videoInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file) await handleFileUpload(file, true);
+        });
+
+        // 清空表单
+        const clearForm = () => {
+            document.getElementById('postContent').value = '';
+            document.getElementById('previewContainer').innerHTML = '';
+        };
+
+        // 初始化渲染
+        renderPosts();
+    </script>
+</body>
+</html>
