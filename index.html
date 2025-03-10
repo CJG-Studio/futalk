@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>纯文字社交平台</title>
+    <title>实时数据库社交平台</title>
     <!-- 引入UI框架 -->
     <link href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.0.0/dist/themes/light.css" rel="stylesheet">
     <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.0.0/dist/shoelace.js"></script>
@@ -35,10 +35,6 @@
             transition: transform 0.2s;
         }
 
-        .post-card:hover {
-            transform: translateY(-2px);
-        }
-
         .post-content {
             font-size: 1.1rem;
             line-height: 1.6;
@@ -64,7 +60,7 @@
         <!-- 头部 -->
         <sl-card class="header">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h1 style="margin: 0;">文字社交平台</h1>
+                <h1 style="margin: 0;">实时社交平台</h1>
                 <sl-input class="search-box" placeholder="搜索内容..." id="searchInput"></sl-input>
             </div>
         </sl-card>
@@ -85,22 +81,25 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
         import { 
-            getFirestore, collection, addDoc, query, 
-            orderBy, onSnapshot, updateDoc, doc 
-        } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+            getDatabase, ref, push, onValue, 
+            query, orderByChild, update, serverTimestamp 
+        } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
 
+        // Firebase配置（替换为你的配置）
         const firebaseConfig = {
-          apiKey: "AIzaSyC12z7Xg6hbOZqq_AOyZ6djEhZAYTxHTbY",
-          authDomain: "futalk-b3245.firebaseapp.com",
-          projectId: "futalk-b3245",
-          storageBucket: "futalk-b3245.firebasestorage.app",
-          messagingSenderId: "458769584283",
-          appId: "1:458769584283:web:0dfa246b5f22e891f8f63e",
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            databaseURL: "YOUR_DATABASE_URL",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
         };
 
         // 初始化Firebase
         const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
+        const db = getDatabase(app);
+        const postsRef = ref(db, 'posts');
 
         // 元素引用
         const postContent = document.getElementById('postContent');
@@ -112,10 +111,10 @@
             if (!content) return;
 
             try {
-                await addDoc(collection(db, "posts"), {
-                    content,
+                await push(postsRef, {
+                    content: content,
                     likes: 0,
-                    createdAt: new Date().toISOString()
+                    createdAt: serverTimestamp()
                 });
                 postContent.value = '';
             } catch (error) {
@@ -123,22 +122,28 @@
             }
         });
 
-        // 实时获取动态
-        const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
-        onSnapshot(q, (snapshot) => {
+        // 实时监听数据变化
+        const postsQuery = query(postsRef, orderByChild('createdAt'));
+        onValue(postsQuery, (snapshot) => {
             const postsContainer = document.getElementById('postsContainer');
             postsContainer.innerHTML = '';
             
-            if (snapshot.empty) {
+            if (!snapshot.exists()) {
                 postsContainer.innerHTML = '<div class="post-card">还没有动态，快来发布第一个吧！</div>';
                 return;
             }
 
-            // 随机排序
+            // 转换数据结构并随机排序
             const posts = [];
-            snapshot.forEach(doc => posts.push({ id: doc.id, ...doc.data() }));
+            snapshot.forEach(childSnapshot => {
+                posts.push({
+                    id: childSnapshot.key,
+                    ...childSnapshot.val()
+                });
+            });
             const shuffledPosts = posts.sort(() => Math.random() - 0.5);
 
+            // 渲染动态
             shuffledPosts.forEach(post => {
                 const card = document.createElement('sl-card');
                 card.className = 'post-card';
@@ -159,7 +164,8 @@
                 const likeBtn = document.getElementById(`like-${post.id}`);
                 likeBtn.addEventListener('click', async () => {
                     try {
-                        await updateDoc(doc(db, "posts", post.id), {
+                        const postRef = ref(db, `posts/${post.id}`);
+                        await update(postRef, {
                             likes: post.likes + 1
                         });
                     } catch (error) {
@@ -169,22 +175,30 @@
             });
         });
 
-        // 搜索功能
-        document.getElementById('searchInput').addEventListener('input', async (e) => {
+        // 搜索功能实现
+        document.getElementById('searchInput').addEventListener('input', (e) => {
             const keyword = e.target.value.toLowerCase();
-            const snapshot = await getDocs(collection(db, "posts"));
-            const filtered = snapshot.docs
-                .filter(doc => doc.data().content.toLowerCase().includes(keyword))
-                .map(doc => ({ id: doc.id, ...doc.data() }));
-            
-            renderPosts(filtered);
+            onValue(postsQuery, (snapshot) => {
+                const filteredPosts = [];
+                snapshot.forEach(childSnapshot => {
+                    const post = childSnapshot.val();
+                    if (post.content.toLowerCase().includes(keyword)) {
+                        filteredPosts.push({
+                            id: childSnapshot.key,
+                            ...post
+                        });
+                    }
+                });
+                renderPosts(filteredPosts.sort(() => Math.random() - 0.5));
+            });
         });
 
+        // 通用渲染方法
         function renderPosts(posts) {
             const container = document.getElementById('postsContainer');
             container.innerHTML = '';
             
-            (posts || []).forEach(post => {
+            posts.forEach(post => {
                 const card = document.createElement('sl-card');
                 card.className = 'post-card';
                 card.innerHTML = `
