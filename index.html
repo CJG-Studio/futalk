@@ -3,89 +3,163 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Futalk|分享文字</title>
-    <!-- 引入UI框架 -->
+    <title>Futalk</title>
     <link href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.0.0/dist/themes/light.css" rel="stylesheet">
     <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.0.0/dist/shoelace.js"></script>
-    
     <style>
         :root {
-            --primary-color: #3b82f6;
-            --background: #f8fafc;
+            --primary-color: #1DA1F2;
+            --background: #ffffff;
+            --border-color: #e0e0e0;
         }
 
         body {
-            font-family: 'Segoe UI', system-ui;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background: var(--background);
             margin: 0;
+            display: grid;
+            grid-template-columns: 240px 1fr;
+            min-height: 100vh;
+        }
+
+        /* 左侧导航栏 */
+        .sidebar {
+            position: fixed;
+            width: 240px;
+            height: 100vh;
+            padding: 1rem;
+            border-right: 1px solid var(--border-color);
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            margin: 4px 0;
+            border-radius: 24px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .nav-item:hover {
+            background: rgba(29, 161, 242, 0.1);
+        }
+
+        .nav-item sl-icon {
+            margin-right: 16px;
+            font-size: 1.5rem;
+        }
+
+        /* 主内容区 */
+        .main-content {
+            max-width: 600px;
+            margin: 0 auto;
             padding: 1rem;
         }
 
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
+        /* 发布卡片 */
+        .compose-card {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
         }
 
-        .post-card {
-            background: white;
-            border-radius: 12px;
-            padding: 1.5rem;
-            margin: 1rem 0;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            transition: transform 0.2s;
+        /* 推文卡片 */
+        .tweet-card {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            transition: background 0.2s;
         }
 
-        .post-content {
-            font-size: 1.1rem;
-            line-height: 1.6;
-            color: #334155;
-            margin: 1rem 0;
+        .tweet-card:hover {
+            background: #f7f7f7;
         }
 
-        .search-box {
-            width: 100%;
-            max-width: 400px;
-            margin: 1rem 0;
+        .tweet-content {
+            font-size: 15px;
+            line-height: 20px;
+            margin: 12px 0;
+            white-space: pre-wrap;
         }
 
-        .loading {
-            text-align: center;
-            padding: 2rem;
-            color: #64748b;
+        .char-counter {
+            text-align: right;
+            color: #657786;
+            font-size: 14px;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            body {
+                grid-template-columns: 1fr;
+            }
+            .sidebar {
+                display: none;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- 头部 -->
-        <sl-card class="header">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h1 style="color: yellow:">Futalk</h1>
-                <sl-input class="search-box" placeholder="搜索内容..." id="searchInput"></sl-input>
-            </div>
-        </sl-card>
+    <!-- 左侧导航栏 -->
+    <nav class="sidebar">
+        <div class="nav-item" onclick="window.location.reload()">
+            <sl-icon name="house-door"></sl-icon>
+            主页
+        </div>
+        <div class="nav-item" onclick="openCompose()">
+            <sl-icon name="pencil-square"></sl-icon>
+            投稿
+        </div>
+        <div class="nav-item" onclick="document.getElementById('searchDialog').show()">
+            <sl-icon name="search"></sl-icon>
+            搜索
+        </div>
+        <div class="nav-item" onclick="document.getElementById('donateDialog').show()">
+            <sl-icon name="heart"></sl-icon>
+            捐赠
+        </div>
+    </nav>
 
-        <!-- 发布区域 -->
-        <sl-card style="margin-bottom: 2rem;">
-            <sl-textarea id="postContent" placeholder="分享你的想法..." rows="3"></sl-textarea>
-            <sl-button variant="primary" id="postBtn" style="margin-top: 1rem; width: 100%;">
-                发布动态
+    <!-- 主内容区 -->
+    <main class="main-content">
+        <!-- 发布卡片 -->
+        <div class="compose-card">
+            <sl-textarea 
+                id="postContent"
+                placeholder="有什么新鲜事？"
+                rows="3"
+                maxlength="1500"
+                @input="updateCharCounter"
+            ></sl-textarea>
+            <div class="char-counter" id="charCounter">0/1500</div>
+            <sl-button variant="primary" style="margin-top: 12px;" onclick="postTweet()">
+                推文
             </sl-button>
-        </sl-card>
+        </div>
 
-        <!-- 动态展示区 -->
-        <div id="postsContainer" class="loading">加载中...</div>
-    </div>
+        <!-- 推文列表 -->
+        <div id="tweetsContainer"></div>
+    </main>
+
+    <!-- 模态对话框 -->
+    <sl-dialog id="searchDialog" label="搜索推文">
+        <sl-input placeholder="输入搜索关键词..." id="searchInput"></sl-input>
+        <div id="searchResults" style="margin-top: 1rem;"></div>
+    </sl-dialog>
+
+    <sl-dialog id="donateDialog" label="支持我们">
+        <p>感谢您考虑支持我们的服务！</p>
+        <sl-qr-code value="bitcoin:1AbCdEfGhIjKlMnOpQrStUvWxYz" size="128"></sl-qr-code>
+        <p style="margin-top: 1rem;">比特币地址：1AbCdEfGhIjKlMnOpQrStUvWxYz</p>
+    </sl-dialog>
 
     <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
         import { 
             getDatabase, ref, push, onValue, 
-            query, orderByChild, update, serverTimestamp 
+            query, orderByChild, update 
         } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
 
-        // Firebase配置（替换为你的配置）
         const firebaseConfig = {
             apiKey: "AIzaSyDfiQkOKKBopKZlkOaz26YdVVf2FqWohpA",
             authDomain: "futalk-eu-org.firebaseapp.com",
@@ -96,126 +170,101 @@
             appId: "1:638501540904:web:2a487bec5ff25d832a511d",
             measurementId: "G-YJX950N9CP"
         };
-
-        // 初始化Firebase
+        
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
-        const postsRef = ref(db, 'posts');
+        const tweetsRef = ref(db, 'tweets');
 
-        // 元素引用
-        const postContent = document.getElementById('postContent');
-        const postBtn = document.getElementById('postBtn');
+        // 字符计数器
+        function updateCharCounter() {
+            const content = document.getElementById('postContent').value;
+            document.getElementById('charCounter').textContent = 
+                `${content.length}/1500`;
+        }
 
-        // 发布动态
-        postBtn.addEventListener('click', async () => {
-            const content = postContent.value.trim();
-            if (!content) return;
-
-            try {
-                await push(postsRef, {
-                    content: content,
-                    likes: 0,
-                    createdAt: serverTimestamp()
-                });
-                postContent.value = '';
-            } catch (error) {
-                console.error("发布失败:", error);
-            }
-        });
-
-        // 实时监听数据变化
-        const postsQuery = query(postsRef, orderByChild('createdAt'));
-        onValue(postsQuery, (snapshot) => {
-            const postsContainer = document.getElementById('postsContainer');
-            postsContainer.innerHTML = '';
+        // 发布推文
+        async function postTweet() {
+            const content = document.getElementById('postContent').value.trim();
             
-            if (!snapshot.exists()) {
-                postsContainer.innerHTML = '<div class="post-card">还没有动态，快来发布第一个吧！</div>';
+            if (!content) {
+                alert("内容不能为空");
+                return;
+            }
+            
+            if (content.length > 1500) {
+                alert("内容超过1500字限制");
                 return;
             }
 
-            // 转换数据结构并随机排序
-            const posts = [];
-            snapshot.forEach(childSnapshot => {
-                posts.push({
-                    id: childSnapshot.key,
-                    ...childSnapshot.val()
+            try {
+                await push(tweetsRef, {
+                    content,
+                    likes: 0,
+                    createdAt: Date.now(),
+                    replies: 0
                 });
-            });
-            const shuffledPosts = posts.sort(() => Math.random() - 0.5);
+                document.getElementById('postContent').value = '';
+            } catch (error) {
+                console.error("发布失败:", error);
+            }
+        }
 
-            // 渲染动态
-            shuffledPosts.forEach(post => {
-                const card = document.createElement('sl-card');
-                card.className = 'post-card';
-                card.innerHTML = `
-                    <div style="color: #64748b; font-size: 0.875rem; margin-bottom: 0.5rem;">
-                        ${new Date(post.createdAt).toLocaleString()}
-                    </div>
-                    <div class="post-content">${post.content}</div>
-                    <div style="margin-top: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-                        <sl-button variant="text" size="small" id="like-${post.id}">
-                            <sl-icon name="heart"></sl-icon> ${post.likes}
-                        </sl-button>
-                    </div>
-                `;
-                postsContainer.appendChild(card);
-
-                // 点赞功能
-                const likeBtn = document.getElementById(`like-${post.id}`);
-                likeBtn.addEventListener('click', async () => {
-                    try {
-                        const postRef = ref(db, `posts/${post.id}`);
-                        await update(postRef, {
-                            likes: post.likes + 1
-                        });
-                    } catch (error) {
-                        console.error("点赞失败:", error);
-                    }
-                });
-            });
-        });
-
-        // 搜索功能实现
-        document.getElementById('searchInput').addEventListener('input', (e) => {
-            const keyword = e.target.value.toLowerCase();
-            onValue(postsQuery, (snapshot) => {
-                const filteredPosts = [];
-                snapshot.forEach(childSnapshot => {
-                    const post = childSnapshot.val();
-                    if (post.content.toLowerCase().includes(keyword)) {
-                        filteredPosts.push({
-                            id: childSnapshot.key,
-                            ...post
-                        });
-                    }
-                });
-                renderPosts(filteredPosts.sort(() => Math.random() - 0.5));
-            });
-        });
-
-        // 通用渲染方法
-        function renderPosts(posts) {
-            const container = document.getElementById('postsContainer');
+        // 实时加载推文
+        const tweetsQuery = query(tweetsRef, orderByChild('createdAt'));
+        onValue(tweetsQuery, (snapshot) => {
+            const container = document.getElementById('tweetsContainer');
             container.innerHTML = '';
             
-            posts.forEach(post => {
-                const card = document.createElement('sl-card');
-                card.className = 'post-card';
-                card.innerHTML = `
-                    <div style="color: #64748b; font-size: 0.875rem; margin-bottom: 0.5rem;">
-                        ${new Date(post.createdAt).toLocaleString()}
+            snapshot.forEach(childSnapshot => {
+                const tweet = childSnapshot.val();
+                const tweetEl = document.createElement('div');
+                tweetEl.className = 'tweet-card';
+                tweetEl.innerHTML = `
+                    <div style="color: #657786; font-size: 14px;">
+                        ${new Date(tweet.createdAt).toLocaleString()}
                     </div>
-                    <div class="post-content">${post.content}</div>
-                    <div style="margin-top: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-                        <sl-button variant="text" size="small" id="like-${post.id}">
-                            <sl-icon name="heart"></sl-icon> ${post.likes}
+                    <div class="tweet-content">${tweet.content}</div>
+                    <div style="display: flex; gap: 24px; color: #657786;">
+                        <sl-button variant="text" size="small" 
+                            onclick="handleLike('${childSnapshot.key}', ${tweet.likes})">
+                            <sl-icon name="heart"></sl-icon> ${tweet.likes}
                         </sl-button>
                     </div>
                 `;
-                container.appendChild(card);
+                container.prepend(tweetEl); // 最新推文显示在最前面
             });
+        });
+
+        // 点赞处理
+        window.handleLike = async (tweetId, currentLikes) => {
+            try {
+                const tweetRef = ref(db, `tweets/${tweetId}`);
+                await update(tweetRef, {
+                    likes: currentLikes + 1
+                });
+            } catch (error) {
+                console.error("点赞失败:", error);
+            }
         }
+
+        // 搜索功能
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            const keyword = e.target.value.toLowerCase();
+            const results = document.getElementById('searchResults');
+            results.innerHTML = '';
+            
+            onValue(tweetsQuery, (snapshot) => {
+                snapshot.forEach(childSnapshot => {
+                    const tweet = childSnapshot.val();
+                    if (tweet.content.toLowerCase().includes(keyword)) {
+                        const div = document.createElement('div');
+                        div.className = 'tweet-card';
+                        div.textContent = tweet.content;
+                        results.appendChild(div);
+                    }
+                });
+            });
+        });
     </script>
 </body>
 </html>
