@@ -161,7 +161,7 @@
                 ></sl-textarea>
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem;">
                     <div class="char-counter" id="charCounter">0/1500</div>
-                    <sl-button variant="primary" onclick="postTweet()">
+                    <sl-button variant="primary" onclick="window.postTweet()">
                         推文
                     </sl-button>
                 </div>
@@ -207,13 +207,6 @@
         const db = getDatabase(app);
         const tweetsRef = ref(db, 'tweets');
 
-        // 字符计数器
-        function updateCharCounter() {
-            const content = document.getElementById('postContent').value;
-            document.getElementById('charCounter').textContent = 
-                `${content.length}/1500`;
-        }
-
         // 暴露函数到全局作用域
         window.openCompose = function() {
             document.getElementById('composeCard').style.display = 'block';
@@ -228,8 +221,8 @@
             document.getElementById('charCounter').textContent = '0/1500';
         }
 
-        // 修改后的发布函数
-        async function postTweet() {
+        // 暴露必要函数到全局作用域
+        window.postTweet = async function() {
             const content = document.getElementById('postContent').value.trim();
             
             if (!content) {
@@ -241,7 +234,7 @@
                 alert("内容超过1500字限制");
                 return;
             }
-
+    
             try {
                 await push(tweetsRef, {
                     content,
@@ -249,15 +242,30 @@
                     createdAt: Date.now(),
                     replies: 0
                 });
-                closeCompose(); // 发布后关闭窗口
+                window.closeCompose();
             } catch (error) {
                 console.error("发布失败:", error);
+                alert("发布失败，请检查控制台");
             }
         }
-
-        // 点击遮罩层关闭
-        document.getElementById('overlay').addEventListener('click', closeCompose);
-
+    
+        window.handleLike = async (tweetId, currentLikes) => {
+            try {
+                const tweetRef = ref(db, `tweets/${tweetId}`);
+                await update(tweetRef, {
+                    likes: currentLikes + 1
+                });
+            } catch (error) {
+                console.error("点赞失败:", error);
+            }
+        }
+    
+        // 字符计数器
+        document.getElementById('postContent').addEventListener('input', function() {
+            document.getElementById('charCounter').textContent = 
+                `${this.value.length}/1500`;
+        });
+    
         // 实时加载推文
         const tweetsQuery = query(tweetsRef, orderByChild('createdAt'));
         onValue(tweetsQuery, (snapshot) => {
@@ -275,26 +283,16 @@
                     <div class="tweet-content">${tweet.content}</div>
                     <div style="display: flex; gap: 24px; color: #657786;">
                         <sl-button variant="text" size="small" 
-                            onclick="handleLike('${childSnapshot.key}', ${tweet.likes})">
+                            onclick="window.handleLike('${childSnapshot.key}', ${tweet.likes})">
                             <sl-icon name="heart"></sl-icon> ${tweet.likes}
                         </sl-button>
                     </div>
                 `;
-                container.prepend(tweetEl); // 最新推文显示在最前面
+                container.prepend(tweetEl);
             });
         });
-
-        // 点赞处理
-        window.handleLike = async (tweetId, currentLikes) => {
-            try {
-                const tweetRef = ref(db, `tweets/${tweetId}`);
-                await update(tweetRef, {
-                    likes: currentLikes + 1
-                });
-            } catch (error) {
-                console.error("点赞失败:", error);
-            }
-        }
+        // 点击遮罩层关闭
+        document.getElementById('overlay').addEventListener('click', closeCompose);
 
         // 搜索功能
         document.getElementById('searchInput').addEventListener('input', (e) => {
