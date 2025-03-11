@@ -33,28 +33,40 @@
             z-index: 100;
         }
     
-        /* 主内容区 */
+        /* 新增/修改样式 */
         .main-content {
-            margin-left: 240px; /* 新增左边距 */
-            max-width: 600px;
+            margin-left: 240px;
+            max-width: 800px; /* 增加最大宽度 */
             width: 100%;
-            padding: 1rem;
-            box-sizing: border-box;
-            position: relative; /* 建立新的定位上下文 */
-            overflow-x: hidden; /* 防止水平滚动 */
+            padding: 2rem;
         }
 
         .tweet-card {
-            margin-top: 16px; /* 增加推文间距 */
+            width: 100%;
+            margin: 1rem 0;
+            padding: 1.5rem;
             background: white;
-            padding: 16px;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            position:absolute;
-            left: 150px;
-            padding: 1rem;
-            border-bottom: 1px solid var(--border-color);
-            transition: background 0.2s;
+            border-radius: 16px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+        }
+
+        .comment-section {
+            margin-top: 1rem;
+            padding-left: 2rem;
+            border-left: 3px solid #e0e0e0;
+        }
+
+        .comment-input {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .comment-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 0.8rem;
+            margin: 0.5rem 0;
         }
         
         /* 移动端适配 */
@@ -286,7 +298,41 @@
             document.getElementById('charCounter').textContent = 
                 `${this.value.length}/1500`;
         });
-    
+
+                // 新增评论功能逻辑
+        window.toggleComments = function(tweetId) {
+            const section = document.getElementById(`comments-${tweetId}`);
+            section.style.display = section.style.display === 'none' ? 'block' : 'none';
+        }
+
+        window.postComment = async function(tweetId) {
+            const input = document.getElementById(`commentInput-${tweetId}`);
+            const content = input.value.trim();
+            
+            if (!content) {
+                alert("评论内容不能为空");
+                return;
+            }
+
+            try {
+                const commentRef = ref(db, `tweets/${tweetId}/comments`);
+                await push(commentRef, {
+                    content,
+                    author: "匿名用户", // 可替换为实际用户系统
+                    createdAt: Date.now()
+                });
+                input.value = '';
+                
+                // 更新评论计数
+                const tweetRef = ref(db, `tweets/${tweetId}`);
+                await update(tweetRef, {
+                    commentCount: increment(1)
+                });
+            } catch (error) {
+                console.error("评论失败:", error);
+            }
+        }
+
         // 实时加载推文
         const tweetsQuery = query(tweetsRef, orderByChild('createdAt'));
         onValue(tweetsQuery, (snapshot) => {
@@ -303,13 +349,48 @@
                     </div>
                     <div class="tweet-content">${tweet.content}</div>
                     <div style="display: flex; gap: 24px; color: #657786;">
+                        <sl-button variant="text" size="small" onclick="toggleComments('${tweetId}')">
+                            <sl-icon name="chat"></sl-icon> ${tweet.commentCount || 0}
+                        </sl-button>
                         <sl-button variant="text" size="small" 
                             onclick="window.handleLike('${childSnapshot.key}', ${tweet.likes})">
                             <sl-icon name="heart"></sl-icon> ${tweet.likes}
                         </sl-button>
                     </div>
+                    <!-- 评论区域 -->
+                    <div id="comments-${tweetId}" class="comment-section" style="display: none;">
+                        <div class="comment-input">
+                            <sl-input id="commentInput-${tweetId}" placeholder="写下你的评论..." style="flex:1;"></sl-input>
+                            <sl-button variant="primary" size="small" onclick="postComment('${tweetId}')">
+                                评论
+                            </sl-button>
+                        </div>
+                        <div id="commentList-${tweetId}"></div>
+                    </div>
                 `;
                 container.prepend(tweetEl);
+                // 监听评论变化
+                const commentsRef = ref(db, `tweets/${childSnapshot.key}/comments`);
+                onValue(commentsRef, (commentSnapshot) => {
+                    const container = document.getElementById(`commentList-${childSnapshot.key}`);
+                    container.innerHTML = '';
+                    
+                    commentSnapshot.forEach(commentChild => {
+                        const comment = commentChild.val();
+                        const div = document.createElement('div');
+                        div.className = 'comment-card';
+                        div.innerHTML = `
+                            <div style="font-size: 0.9rem; color: #2d3436;">
+                                <strong>${comment.author}</strong>
+                                <span style="color: #636e72; font-size: 0.8rem;">
+                                    ${new Date(comment.createdAt).toLocaleString()}
+                                </span>
+                            </div>
+                            <div style="margin-top: 0.5rem;">${comment.content}</div>
+                        `;
+                        container.appendChild(div);
+                    });
+                });
             });
         });
         // 点击遮罩层关闭
