@@ -58,7 +58,7 @@
         }
 
         .compose-card {
-            display: none; 
+            display: none;
             position: fixed;
             top: 50%;
             left: 50%;
@@ -129,7 +129,7 @@
             <sl-icon name="house-door"></sl-icon>
             主页
         </div>
-        <div class="nav-item" onclick="openCompose()">
+        <div class="nav-item" onclick="window.openCompose()">
             <sl-icon name="pencil-square"></sl-icon>
             投稿
         </div>
@@ -214,14 +214,14 @@
                 `${content.length}/1500`;
         }
 
-        // 新增功能控制函数
-        function openCompose() {
+        // 暴露函数到全局作用域
+        window.openCompose = function() {
             document.getElementById('composeCard').style.display = 'block';
             document.getElementById('overlay').style.display = 'block';
             document.getElementById('postContent').focus();
         }
 
-        function closeCompose() {
+        window.closeCompose = function() {
             document.getElementById('composeCard').style.display = 'none';
             document.getElementById('overlay').style.display = 'none';
             document.getElementById('postContent').value = '';
