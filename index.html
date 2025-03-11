@@ -21,7 +21,7 @@
             grid-template-columns: 240px 1fr;
             min-height: 100vh;
         }
-
+    
         /* 左侧导航栏 */
         .sidebar {
             position: fixed;
@@ -29,6 +29,45 @@
             height: 100vh;
             padding: 1rem;
             border-right: 1px solid var(--border-color);
+            background: white;
+            z-index: 100;
+        }
+    
+        /* 主内容区 */
+        .main-content {
+            margin-left: 240px; /* 新增左边距 */
+            max-width: 600px;
+            width: 100%;
+            padding: 1rem;
+            box-sizing: border-box;
+            position: relative; /* 建立新的定位上下文 */
+            overflow-x: hidden; /* 防止水平滚动 */
+        }
+
+        .tweet-card {
+            margin-top: 16px; /* 增加推文间距 */
+            background: white;
+            padding: 16px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            magrin: 0;
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            transition: background 0.2s;
+        }
+        
+        /* 移动端适配 */
+        @media (max-width: 768px) {
+            body {
+                grid-template-columns: 1fr;
+            }
+            .sidebar {
+                display: none;
+            }
+            .main-content {
+                margin-left: 0;
+                padding: 0.5rem;
+            }
         }
 
         .nav-item {
@@ -48,13 +87,6 @@
         .nav-item sl-icon {
             margin-right: 16px;
             font-size: 1.5rem;
-        }
-
-        /* 主内容区 */
-        .main-content {
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 1rem;
         }
 
         .compose-card {
@@ -80,19 +112,6 @@
             bottom: 0;
             background: rgba(0,0,0,0.5);
             z-index: 999;
-        }
-
-        /* 调整主内容区 */
-        .main-content {
-            padding-top: 2rem;
-        }
-        
-        /* 推文卡片 */
-        .tweet-card {
-            magrin: 0;
-            padding: 1rem;
-            border-bottom: 1px solid var(--border-color);
-            transition: background 0.2s;
         }
 
         .tweet-card:hover {
