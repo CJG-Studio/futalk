@@ -57,12 +57,36 @@
             padding: 1rem;
         }
 
-        /* 发布卡片 */
         .compose-card {
-            padding: 1rem;
-            border-bottom: 1px solid var(--border-color);
+            display: none; 
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            width: 600px;
+            max-width: 90%;
+            border-radius: 16px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
         }
 
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+        }
+
+        /* 调整主内容区 */
+        .main-content {
+            padding-top: 2rem;
+        }
+        
         /* 推文卡片 */
         .tweet-card {
             padding: 1rem;
@@ -121,19 +145,27 @@
 
     <!-- 主内容区 -->
     <main class="main-content">
-        <!-- 发布卡片 -->
-        <div class="compose-card">
-            <sl-textarea 
-                id="postContent"
-                placeholder="有什么新鲜事？"
-                rows="3"
-                maxlength="1500"
-                @input="updateCharCounter"
-            ></sl-textarea>
-            <div class="char-counter" id="charCounter">0/1500</div>
-            <sl-button variant="primary" style="margin-top: 12px;" onclick="postTweet()">
-                推文
-            </sl-button>
+        <div class="overlay" id="overlay"></div>
+        <div class="compose-card" id="composeCard">
+            <div style="padding: 1rem; position: relative;">
+                <sl-button variant="text" style="position: absolute; right: 1rem; top: 1rem;" 
+                          onclick="closeCompose()">
+                    <sl-icon name="x"></sl-icon>
+                </sl-button>
+                <sl-textarea 
+                    id="postContent"
+                    placeholder="有什么新鲜事？"
+                    rows="5"
+                    maxlength="1500"
+                    @input="updateCharCounter"
+                ></sl-textarea>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem;">
+                    <div class="char-counter" id="charCounter">0/1500</div>
+                    <sl-button variant="primary" onclick="postTweet()">
+                        推文
+                    </sl-button>
+                </div>
+            </div>
         </div>
 
         <!-- 推文列表 -->
@@ -182,7 +214,21 @@
                 `${content.length}/1500`;
         }
 
-        // 发布推文
+        // 新增功能控制函数
+        function openCompose() {
+            document.getElementById('composeCard').style.display = 'block';
+            document.getElementById('overlay').style.display = 'block';
+            document.getElementById('postContent').focus();
+        }
+
+        function closeCompose() {
+            document.getElementById('composeCard').style.display = 'none';
+            document.getElementById('overlay').style.display = 'none';
+            document.getElementById('postContent').value = '';
+            document.getElementById('charCounter').textContent = '0/1500';
+        }
+
+        // 修改后的发布函数
         async function postTweet() {
             const content = document.getElementById('postContent').value.trim();
             
@@ -203,11 +249,14 @@
                     createdAt: Date.now(),
                     replies: 0
                 });
-                document.getElementById('postContent').value = '';
+                closeCompose(); // 发布后关闭窗口
             } catch (error) {
                 console.error("发布失败:", error);
             }
         }
+
+        // 点击遮罩层关闭
+        document.getElementById('overlay').addEventListener('click', closeCompose);
 
         // 实时加载推文
         const tweetsQuery = query(tweetsRef, orderByChild('createdAt'));
