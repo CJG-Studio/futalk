@@ -319,7 +319,7 @@
                 const commentRef = ref(db, `tweets/${tweetId}/comments`);
                 await push(commentRef, {
                     content,
-                    author: "匿名用户", // 可替换为实际用户系统
+                    author: "Futalk用户", // 可替换为实际用户系统
                     createdAt: Date.now()
                 });
                 input.value = '';
@@ -390,7 +390,7 @@
                         div.className = 'comment-card';
                         div.innerHTML = `
                             <div style="font-size: 0.9rem; color: #2d3436;">
-                                <strong>${comment.author || '匿名用户'}</strong>
+                                <strong>${comment.author || 'Futalk用户'}</strong>
                                 <span style="color: #636e72; font-size: 0.8rem;">
                                     ${new Date(comment.createdAt).toLocaleString()}
                                 </span>
