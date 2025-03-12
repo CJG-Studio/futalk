@@ -335,12 +335,15 @@
 
         // 实时加载推文
         const tweetsQuery = query(tweetsRef, orderByChild('createdAt'));
+        // 修改后的推文渲染逻辑
         onValue(tweetsQuery, (snapshot) => {
             const container = document.getElementById('tweetsContainer');
             container.innerHTML = '';
             
             snapshot.forEach(childSnapshot => {
                 const tweet = childSnapshot.val();
+                const tweetId = childSnapshot.key; // 获取正确的推文ID
+                
                 const tweetEl = document.createElement('div');
                 tweetEl.className = 'tweet-card';
                 tweetEl.innerHTML = `
@@ -349,19 +352,23 @@
                     </div>
                     <div class="tweet-content">${tweet.content}</div>
                     <div style="display: flex; gap: 24px; color: #657786;">
-                        <sl-button variant="text" size="small" onclick="toggleComments('${tweetId}')">
-                            <sl-icon name="chat"></sl-icon> ${tweet.commentCount || 0}
-                        </sl-button>
                         <sl-button variant="text" size="small" 
-                            onclick="window.handleLike('${childSnapshot.key}', ${tweet.likes})">
+                            onclick="window.handleLike('${tweetId}', ${tweet.likes})">
                             <sl-icon name="heart"></sl-icon> ${tweet.likes}
                         </sl-button>
+                        <sl-button variant="text" size="small" 
+                            onclick="window.toggleComments('${tweetId}')">
+                            <sl-icon name="chat"></sl-icon> ${tweet.commentCount || 0}
+                        </sl-button>
                     </div>
-                    <!-- 评论区域 -->
                     <div id="comments-${tweetId}" class="comment-section" style="display: none;">
                         <div class="comment-input">
-                            <sl-input id="commentInput-${tweetId}" placeholder="写下你的评论..." style="flex:1;"></sl-input>
-                            <sl-button variant="primary" size="small" onclick="postComment('${tweetId}')">
+                            <sl-input id="commentInput-${tweetId}" 
+                                placeholder="写下你的评论..." 
+                                style="flex:1;"></sl-input>
+                            <sl-button variant="primary" 
+                                size="small" 
+                                onclick="window.postComment('${tweetId}')">
                                 评论
                             </sl-button>
                         </div>
@@ -369,10 +376,11 @@
                     </div>
                 `;
                 container.prepend(tweetEl);
+    
                 // 监听评论变化
-                const commentsRef = ref(db, `tweets/${childSnapshot.key}/comments`);
+                const commentsRef = ref(db, `tweets/${tweetId}/comments`);
                 onValue(commentsRef, (commentSnapshot) => {
-                    const container = document.getElementById(`commentList-${childSnapshot.key}`);
+                    const container = document.getElementById(`commentList-${tweetId}`);
                     container.innerHTML = '';
                     
                     commentSnapshot.forEach(commentChild => {
@@ -381,7 +389,7 @@
                         div.className = 'comment-card';
                         div.innerHTML = `
                             <div style="font-size: 0.9rem; color: #2d3436;">
-                                <strong>${comment.author}</strong>
+                                <strong>${comment.author || '匿名用户'}</strong>
                                 <span style="color: #636e72; font-size: 0.8rem;">
                                     ${new Date(comment.createdAt).toLocaleString()}
                                 </span>
