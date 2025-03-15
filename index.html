@@ -22,17 +22,19 @@
             min-height: 100vh;
         }
         
-        .bg{
-            background-image:url(/background.jpg);
-            width:100%;
+        .blur-container {
+          position: relative;
+          width: 100%;
         }
         
-        .bg-blur{
-            float:left;
-            background-position:center;
-            background-repeat:no-repeat;
-            background-size:cover;
-            backdrop-filter: blur(10px);
+        .blur-background {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background-image: url("/background.jpg");
+          filter: blur(10px);
         }
 
         /* 左侧导航栏 */
@@ -172,8 +174,8 @@
     </style>
 </head>
 <body>
-    <div>
-        <div class="bg bg-blur"></div>
+    <div class="blur-container">
+      <div class="blur-background"></div>
     </div>
     <!-- 左侧导航栏 -->
     <nav class="sidebar">
