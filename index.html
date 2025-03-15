@@ -21,21 +21,6 @@
             grid-template-columns: 240px 1fr;
             min-height: 100vh;
         }
-        
-        .blur-container {
-          position: relative;
-          width: 100%;
-        }
-        
-        .blur-background {
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          background-image: url("/background.jpg");
-          filter: blur(10px);
-        }
 
         /* 左侧导航栏 */
         .sidebar {
@@ -173,10 +158,7 @@
         }
     </style>
 </head>
-<body>
-    <div class="blur-container">
-      <div class="blur-background"></div>
-    </div>
+<body background="background.jpg">
     <!-- 左侧导航栏 -->
     <nav class="sidebar">
         <div class="nav-item">
