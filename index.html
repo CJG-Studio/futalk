@@ -268,7 +268,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
         import { 
             getDatabase, ref, push, onValue, 
-            query, orderByChild, update 
+            query, orderByChild, update, get  // 添加get方法
         } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
 
         const firebaseConfig = {
@@ -306,7 +306,13 @@
                 alert("名称和下载链接不能为空");
                 return;
             }
-        
+            // 验证URL格式
+            try {
+                new URL(url);
+            } catch {
+                alert("请输入有效的URL（需包含http://或https://）");
+                return;
+            }
             try {
                 const resourcesRef = ref(db, 'softwareResources');
                 await push(resourcesRef, {
@@ -331,7 +337,10 @@
             onValue(resourcesQuery, (snapshot) => {
                 const container = document.getElementById('resourcesContainer');
                 container.innerHTML = '';
-        
+                if (!snapshot.exists()) {
+                    container.innerHTML = `<div class="empty-state">暂无资源</div>`;
+                    return;
+                }
                 snapshot.forEach(childSnapshot => {
                     const resource = childSnapshot.val();
                     const resourceId = childSnapshot.key;
@@ -353,25 +362,42 @@
                     `;
                     container.prepend(resourceEl);
                 });
+                }, (error) => {
+                    console.error("加载资源失败:", error);
+                    alert("资源加载失败，请刷新重试");
             });
         }
         
-        // 处理下载
         window.handleDownload = async (resourceId, currentDownloads) => {
             try {
                 const resourceRef = ref(db, `softwareResources/${resourceId}`);
-                // 获取资源URL
-                const snapshot = await get(resourceRef);
-                window.open(snapshot.val().url, '_blank');
                 
-                // 更新下载量
-                await update(resourceRef, {
-                    downloads: currentDownloads + 1
-                });
+                // 获取最新数据
+                const snapshot = await get(resourceRef);
+                if (!snapshot.exists()) {
+                    alert("资源不存在");
+                    return;
+                }
+                
+                const resourceData = snapshot.val();
+                
+                // 打开下载链接
+                if(resourceData.url) {
+                    window.open(resourceData.url, '_blank');
+                    
+                    // 更新下载量（使用increment保证原子性）
+                    await update(resourceRef, {
+                        downloads: (resourceData.downloads || 0) + 1
+                    });
+                } else {
+                    alert("无效的下载链接");
+                }
             } catch (error) {
                 console.error("下载失败:", error);
+                alert(`下载失败：${error.message}`);
             }
         }
+        
         // 暴露函数到全局作用域
         window.openCompose = function() {
             document.getElementById('composeCard').style.display = 'block';
