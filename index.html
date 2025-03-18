@@ -68,7 +68,32 @@
             padding: 0.8rem;
             margin: 0.5rem 0;
         }
+        .resource-card {
+            width: 100%;
+            margin: 1rem 0;
+            padding: 1.5rem;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
         
+        .resource-card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .download-btn {
+            margin-top: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .resource-meta {
+            color: #657786;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
         /* 移动端适配 */
         @media (max-width: 768px) {
             body {
@@ -172,9 +197,17 @@
             <sl-icon name="pencil-square"></sl-icon>
             投稿
         </div>
+        <div class="nav-item" onclick="document.getElementById('resourceDialog').show()">
+            <sl-icon name="plus-circle"></sl-icon>
+            发布资源
+        </div>
+        <div class="nav-item" onclick="window.showResources()">
+            <sl-icon name="download"></sl-icon>
+            资源中心
+        </div>
         <div class="nav-item" onclick="document.getElementById('searchDialog').show()">
             <sl-icon name="search"></sl-icon>
-            搜索
+            搜索帖子
         </div>
         <div class="nav-item" onclick="document.getElementById('donateDialog').show()">
             <sl-icon name="heart"></sl-icon>
@@ -210,7 +243,14 @@
         <!-- 推文列表 -->
         <div id="tweetsContainer"></div>
     </main>
-
+    <sl-dialog id="resourceDialog" label="发布软件资源">
+        <sl-input id="resourceName" label="软件名称" placeholder="请输入软件名称" required></sl-input>
+        <sl-textarea id="resourceDesc" label="软件描述" rows="3" style="margin-top: 1rem;"></sl-textarea>
+        <sl-input id="resourceUrl" label="下载链接" type="url" placeholder="请输入网盘链接" style="margin-top: 1rem;"></sl-input>
+        <div slot="footer">
+            <sl-button variant="primary" onclick="window.submitResource()">发布</sl-button>
+        </div>
+    </sl-dialog>
     <!-- 模态对话框 -->
     <sl-dialog id="searchDialog" label="搜索推文">
         <sl-input placeholder="输入搜索关键词..." id="searchInput"></sl-input>
@@ -245,7 +285,93 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
         const tweetsRef = ref(db, 'tweets');
-
+        
+        // 全局变量控制当前显示内容
+        let currentView = 'tweets';
+        
+        // 显示资源中心
+        window.showResources = function() {
+            currentView = 'resources';
+            document.getElementById('tweetsContainer').innerHTML = '<div id="resourcesContainer"></div>';
+            loadResources();
+        }
+        
+        // 提交资源
+        window.submitResource = async function() {
+            const name = document.getElementById('resourceName').value.trim();
+            const desc = document.getElementById('resourceDesc').value.trim();
+            const url = document.getElementById('resourceUrl').value.trim();
+        
+            if (!name || !url) {
+                alert("名称和下载链接不能为空");
+                return;
+            }
+        
+            try {
+                const resourcesRef = ref(db, 'softwareResources');
+                await push(resourcesRef, {
+                    name,
+                    desc,
+                    url,
+                    downloads: 0,
+                    createdAt: Date.now(),
+                    author: "匿名用户"
+                });
+                document.getElementById('resourceDialog').hide();
+            } catch (error) {
+                console.error("资源发布失败:", error);
+            }
+        }
+        
+        // 加载资源
+        function loadResources() {
+            const resourcesRef = ref(db, 'softwareResources');
+            const resourcesQuery = query(resourcesRef, orderByChild('createdAt'));
+        
+            onValue(resourcesQuery, (snapshot) => {
+                const container = document.getElementById('resourcesContainer');
+                container.innerHTML = '';
+        
+                snapshot.forEach(childSnapshot => {
+                    const resource = childSnapshot.val();
+                    const resourceId = childSnapshot.key;
+        
+                    const resourceEl = document.createElement('div');
+                    resourceEl.className = 'resource-card';
+                    resourceEl.innerHTML = `
+                        <h3 style="margin: 0;">${resource.name}</h3>
+                        <div class="resource-meta">
+                            ${new Date(resource.createdAt).toLocaleString()} · 
+                            下载量：${resource.downloads}
+                        </div>
+                        <p>${resource.desc || '暂无描述'}</p>
+                        <sl-button variant="primary" class="download-btn" 
+                                  onclick="window.handleDownload('${resourceId}', ${resource.downloads})">
+                            <sl-icon name="download"></sl-icon>
+                            立即下载
+                        </sl-button>
+                    `;
+                    container.prepend(resourceEl);
+                });
+            });
+        }
+        
+        // 处理下载
+        window.handleDownload = async (resourceId, currentDownloads) => {
+            try {
+                const resourceRef = ref(db, `softwareResources/${resourceId}`);
+                // 获取资源URL
+                const snapshot = await get(resourceRef);
+                window.open(snapshot.val().url, '_blank');
+                
+                // 更新下载量
+                await update(resourceRef, {
+                    downloads: currentDownloads + 1
+                });
+            } catch (error) {
+                console.error("下载失败:", error);
+            }
+        }
         // 暴露函数到全局作用域
         window.openCompose = function() {
             document.getElementById('composeCard').style.display = 'block';
