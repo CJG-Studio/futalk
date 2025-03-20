@@ -95,6 +95,36 @@
             font-size: 0.9rem;
             margin-top: 0.5rem;
         }
+        .upload-area {
+            border: 2px dashed #e0e0e0;
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+            margin: 1rem 0;
+            cursor: pointer;
+        }
+        
+        .preview-image {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+            margin-top: 1rem;
+            object-fit: contain;
+        }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255,255,255,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+        
         /* 移动端适配 */
         @media (max-width: 768px) {
             body {
@@ -221,6 +251,18 @@
         <div class="overlay" id="overlay"></div>
         <div class="compose-card" id="composeCard">
             <div style="padding: 1rem; position: relative;">
+                <!-- 添加图片上传区域 -->
+                <div class="upload-area" onclick="document.getElementById('imageInput').click()">
+                    <sl-icon name="image" style="font-size: 2rem;"></sl-icon>
+                    <div>点击选择图片（最大600KB）</div>
+                    <input type="file" id="imageInput" accept="image/*" hidden 
+                           @change="handleImageSelect">
+                </div>
+                <img id="previewImage" class="preview-image">
+                <sl-button variant="danger" size="small" 
+                          onclick="clearImage()" style="margin-top: 0.5rem; display: none;">
+                    移除图片
+                </sl-button>
                 <sl-button variant="text" style="position: absolute; right: 1rem; top: 1rem;" 
                           onclick="closeCompose()">
                     <sl-icon name="x"></sl-icon>
@@ -240,8 +282,12 @@
                 </div>
             </div>
         </div>
-
+        <!-- 加载指示器 -->
+        <div class="loading-overlay" id="loading">
+            <sl-spinner style="font-size: 3rem;"></sl-spinner>
+        </div>
         <!-- 推文列表 -->
+        
         <div id="tweetsContainer"></div>
     </main>
     <sl-dialog id="resourceDialog" label="发布软件资源">
@@ -265,12 +311,12 @@
 
     <!-- Firebase SDK -->
     <script type="module">
-        import { increment } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
         import { 
             getDatabase, ref, push, onValue, 
-            query, orderByChild, update, get  // 添加get方法
+            query, orderByChild, update, get,
+            limitToLast, startAfter  // 新增分页方法
         } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+
 
         const firebaseConfig = {
             apiKey: "AIzaSyDfiQkOKKBopKZlkOaz26YdVVf2FqWohpA",
@@ -289,6 +335,42 @@
         
         // 全局变量控制当前显示内容
         let currentView = 'tweets';
+        let lastTweetKey = null;
+        let loading = false;
+        let hasMore = true;
+        let currentImage = null;
+
+        // 图片处理函数
+        window.handleImageSelect = function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+        
+            // 验证文件类型和大小
+            if (!file.type.startsWith('image/')) {
+                alert('请选择图片文件');
+                return;
+            }
+            if (file.size > 600 * 1024) {
+                alert('图片大小不能超过600KB');
+                return;
+            }
+        
+            // 转换为Base64
+            const reader = new FileReader();
+            reader.onload = () => {
+                currentImage = reader.result;
+                document.getElementById('previewImage').src = currentImage;
+                document.querySelector('sl-button[variant="danger"]').style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        };
+        
+        window.clearImage = function() {
+            currentImage = null;
+            document.getElementById('previewImage').src = '';
+            document.getElementById('imageInput').value = '';
+            document.querySelector('sl-button[variant="danger"]').style.display = 'none';
+        };
         
         // 显示资源中心
         window.showResources = function() {
@@ -413,34 +495,36 @@
             document.getElementById('charCounter').textContent = '0/1500';
         }
 
-        // 暴露必要函数到全局作用域
+        // 修改推文发布函数
         window.postTweet = async function() {
             const content = document.getElementById('postContent').value.trim();
             
-            if (!content) {
-                alert("内容不能为空");
+            if (!content && !currentImage) {
+                alert("内容或图片至少需要一项");
                 return;
             }
-            
+                        
             if (content.length > 1500) {
                 alert("内容超过1500字限制");
                 return;
             }
-    
+            
             try {
                 await push(tweetsRef, {
                     content,
+                    image: currentImage || null,  // 存储Base64
                     likes: 0,
                     createdAt: Date.now(),
                     replies: 0
                 });
                 window.closeCompose();
+                clearImage();
             } catch (error) {
                 console.error("发布失败:", error);
                 alert("发布失败，请检查控制台");
             }
-        }
-    
+        };
+        
         window.handleLike = async (tweetId, currentLikes) => {
             try {
                 const tweetRef = ref(db, `tweets/${tweetId}`);
@@ -493,12 +577,76 @@
         }
 
         // 实时加载推文
-        const tweetsQuery = query(tweetsRef, orderByChild('createdAt'));
-        // 修改后的推文渲染逻辑
-        onValue(tweetsQuery, (snapshot) => {
+    // 修改推文渲染逻辑（分页版）
+    function loadTweets(initial = false) {
+        if (loading || !hasMore) return;
+        loading = true;
+        document.getElementById('loading').style.display = 'flex';
+    
+        let q = query(tweetsRef, orderByChild('createdAt'), limitToLast(6));
+        
+        if (!initial && lastTweetKey) {
+            q = query(tweetsRef, orderByChild('createdAt'),
+                          startAfter(lastTweetKey),
+                          limitToLast(6));
+        }
+
+        onValue(q, (snapshot) => {
             const container = document.getElementById('tweetsContainer');
-            container.innerHTML = '';
+            if (initial) container.innerHTML = '';
             
+                const tweets = [];
+                snapshot.forEach(child => {
+                    tweets.push({ key: child.key, ...child.val() });
+                });
+        
+                if (tweets.length < 6) hasMore = false;
+                if (tweets.length > 0) lastTweetKey = tweets[tweets[0].createdAt;
+        
+                tweets.reverse().forEach(tweet => {
+                    const tweetEl = document.createElement('div');
+                    tweetEl.className = 'tweet-card';
+                    tweetEl.innerHTML = `
+                        ${tweet.image ? 
+                            `<img src="${tweet.image}" class="preview-image" 
+                                 style="margin-top: 1rem;">` : ''}
+                            <div style="color: #657786; font-size: 14px;">
+                                ${new Date(tweet.createdAt).toLocaleString()}
+                            </div>
+                            <div class="tweet-content">${tweet.content}</div>
+                            <div style="display: flex; gap: 24px; color: #657786;">
+                                <sl-button variant="text" size="small" 
+                                    onclick="window.handleLike('${tweetId}', ${tweet.likes})">
+                                    <sl-icon name="heart"></sl-icon> ${tweet.likes}
+                                </sl-button>
+                                <sl-button variant="text" size="small" 
+                                    onclick="window.toggleComments('${tweetId}')">
+                                    <sl-icon name="chat"></sl-icon> ${tweet.commentCount || 0}
+                                </sl-button>
+                            </div>
+                            <div id="comments-${tweetId}" class="comment-section" style="display: none;">
+                                <div class="comment-input">
+                                    <sl-input id="commentInput-${tweetId}" 
+                                        placeholder="写下你的评论..." 
+                                        style="flex:1;"></sl-input>
+                                    <sl-button variant="primary" 
+                                        size="small" 
+                                        onclick="window.postComment('${tweetId}')">
+                                        评论
+                                    </sl-button>
+                                </div>
+                                <div id="commentList-${tweetId}"></div>
+                            </div>
+                    `;
+                    container.appendChild(tweetEl);
+                });
+        
+                loading = false;
+                document.getElementById('loading').style.display = 'none';
+            }, {
+                onlyOnce: true  // 只监听一次
+            });
+        
             snapshot.forEach(childSnapshot => {
                 const tweet = childSnapshot.val();
                 const tweetId = childSnapshot.key; // 获取正确的推文ID
@@ -506,33 +654,7 @@
                 const tweetEl = document.createElement('div');
                 tweetEl.className = 'tweet-card';
                 tweetEl.innerHTML = `
-                    <div style="color: #657786; font-size: 14px;">
-                        ${new Date(tweet.createdAt).toLocaleString()}
-                    </div>
-                    <div class="tweet-content">${tweet.content}</div>
-                    <div style="display: flex; gap: 24px; color: #657786;">
-                        <sl-button variant="text" size="small" 
-                            onclick="window.handleLike('${tweetId}', ${tweet.likes})">
-                            <sl-icon name="heart"></sl-icon> ${tweet.likes}
-                        </sl-button>
-                        <sl-button variant="text" size="small" 
-                            onclick="window.toggleComments('${tweetId}')">
-                            <sl-icon name="chat"></sl-icon> ${tweet.commentCount || 0}
-                        </sl-button>
-                    </div>
-                    <div id="comments-${tweetId}" class="comment-section" style="display: none;">
-                        <div class="comment-input">
-                            <sl-input id="commentInput-${tweetId}" 
-                                placeholder="写下你的评论..." 
-                                style="flex:1;"></sl-input>
-                            <sl-button variant="primary" 
-                                size="small" 
-                                onclick="window.postComment('${tweetId}')">
-                                评论
-                            </sl-button>
-                        </div>
-                        <div id="commentList-${tweetId}"></div>
-                    </div>
+
                 `;
                 container.prepend(tweetEl);
     
@@ -559,6 +681,16 @@
                     });
                 });
             });
+        });
+        // 初始化加载
+        loadTweets(true);
+        
+        // 滚动监听
+        window.addEventListener('scroll', () => {
+            const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
+            if (scrollTop + clientHeight >= scrollHeight - 500 && hasMore) {
+                loadTweets();
+            }
         });
         // 点击遮罩层关闭
         document.getElementById('overlay').addEventListener('click', closeCompose);
