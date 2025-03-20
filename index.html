@@ -340,6 +340,26 @@
         let hasMore = true;
         let currentImage = null;
 
+        // 暴露函数到全局作用域
+        window.openCompose = function() {
+            document.getElementById('composeCard').style.display = 'block';
+            document.getElementById('overlay').style.display = 'block';
+            document.getElementById('postContent').focus();
+        }
+
+        window.closeCompose = function() {
+            document.getElementById('composeCard').style.display = 'none';
+            document.getElementById('overlay').style.display = 'none';
+            document.getElementById('postContent').value = '';
+            document.getElementById('charCounter').textContent = '0/1500';
+        }
+        // 显示资源中心
+        window.showResources = function() {
+            currentView = 'resources';
+            document.getElementById('tweetsContainer').innerHTML = '<div id="resourcesContainer"></div>';
+            loadResources();
+        }
+        
         // 图片处理函数
         window.handleImageSelect = function(e) {
             const file = e.target.files[0];
@@ -371,13 +391,6 @@
             document.getElementById('imageInput').value = '';
             document.querySelector('sl-button[variant="danger"]').style.display = 'none';
         };
-        
-        // 显示资源中心
-        window.showResources = function() {
-            currentView = 'resources';
-            document.getElementById('tweetsContainer').innerHTML = '<div id="resourcesContainer"></div>';
-            loadResources();
-        }
         
         // 提交资源
         window.submitResource = async function() {
@@ -480,20 +493,6 @@
                 alert(`下载失败：${error.message}`);
             }
         }
-        
-        // 暴露函数到全局作用域
-        window.openCompose = function() {
-            document.getElementById('composeCard').style.display = 'block';
-            document.getElementById('overlay').style.display = 'block';
-            document.getElementById('postContent').focus();
-        }
-
-        window.closeCompose = function() {
-            document.getElementById('composeCard').style.display = 'none';
-            document.getElementById('overlay').style.display = 'none';
-            document.getElementById('postContent').value = '';
-            document.getElementById('charCounter').textContent = '0/1500';
-        }
 
         // 修改推文发布函数
         window.postTweet = async function() {
@@ -577,111 +576,103 @@
         }
 
         // 实时加载推文
-    // 修改推文渲染逻辑（分页版）
-    function loadTweets(initial = false) {
-        if (loading || !hasMore) return;
-        loading = true;
-        document.getElementById('loading').style.display = 'flex';
-    
-        let q = query(tweetsRef, orderByChild('createdAt'), limitToLast(6));
+        // 修改推文渲染逻辑（分页版）
+        function loadTweets(initial = false) {
+            if (loading || !hasMore) return;
+            loading = true;
+            document.getElementById('loading').style.display = 'flex';
         
-        if (!initial && lastTweetKey) {
-            q = query(tweetsRef, orderByChild('createdAt'),
-                          startAfter(lastTweetKey),
-                          limitToLast(6));
-        }
-
-        onValue(q, (snapshot) => {
-            const container = document.getElementById('tweetsContainer');
-            if (initial) container.innerHTML = '';
+            let q = query(tweetsRef, orderByChild('createdAt'), limitToLast(6));
             
-                const tweets = [];
-                snapshot.forEach(child => {
-                    tweets.push({ key: child.key, ...child.val() });
-                });
-        
-                if (tweets.length < 6) hasMore = false;
-                if (tweets.length > 0) lastTweetKey = tweets[tweets[0].createdAt;
-        
-                tweets.reverse().forEach(tweet => {
-                    const tweetEl = document.createElement('div');
-                    tweetEl.className = 'tweet-card';
-                    tweetEl.innerHTML = `
-                        ${tweet.image ? 
-                            `<img src="${tweet.image}" class="preview-image" 
-                                 style="margin-top: 1rem;">` : ''}
-                            <div style="color: #657786; font-size: 14px;">
-                                ${new Date(tweet.createdAt).toLocaleString()}
-                            </div>
-                            <div class="tweet-content">${tweet.content}</div>
-                            <div style="display: flex; gap: 24px; color: #657786;">
-                                <sl-button variant="text" size="small" 
-                                    onclick="window.handleLike('${tweetId}', ${tweet.likes})">
-                                    <sl-icon name="heart"></sl-icon> ${tweet.likes}
-                                </sl-button>
-                                <sl-button variant="text" size="small" 
-                                    onclick="window.toggleComments('${tweetId}')">
-                                    <sl-icon name="chat"></sl-icon> ${tweet.commentCount || 0}
-                                </sl-button>
-                            </div>
-                            <div id="comments-${tweetId}" class="comment-section" style="display: none;">
-                                <div class="comment-input">
-                                    <sl-input id="commentInput-${tweetId}" 
-                                        placeholder="写下你的评论..." 
-                                        style="flex:1;"></sl-input>
-                                    <sl-button variant="primary" 
-                                        size="small" 
-                                        onclick="window.postComment('${tweetId}')">
-                                        评论
+            if (!initial && lastTweetKey) {
+                q = query(tweetsRef, orderByChild('createdAt'),
+                              startAfter(lastTweetKey),
+                              limitToLast(6));
+            }
+    
+            onValue(q, (snapshot) => {
+                const container = document.getElementById('tweetsContainer');
+                if (initial) container.innerHTML = '';
+                
+                    const tweets = [];
+                    snapshot.forEach(child => {
+                        tweets.push({ key: child.key, ...child.val() });
+                    });
+            
+                    if (tweets.length < 6) hasMore = false;
+                    if (tweets.length > 0) lastTweetKey = tweets[tweets[0].createdAt;
+            
+                    tweets.reverse().forEach(tweet => {
+                        const tweetEl = document.createElement('div');
+                        const tweet = childSnapshot.val();
+                        const tweetId = childSnapshot.key; // 获取正确的推文ID
+                        tweetEl.className = 'tweet-card';
+                        tweetEl.innerHTML = `
+                            ${tweet.image ? 
+                                `<img src="${tweet.image}" class="preview-image" 
+                                     style="margin-top: 1rem;">` : ''}
+                                <div style="color: #657786; font-size: 14px;">
+                                    ${new Date(tweet.createdAt).toLocaleString()}
+                                </div>
+                                <div class="tweet-content">${tweet.content}</div>
+                                <div style="display: flex; gap: 24px; color: #657786;">
+                                    <sl-button variant="text" size="small" 
+                                        onclick="window.handleLike('${tweetId}', ${tweet.likes})">
+                                        <sl-icon name="heart"></sl-icon> ${tweet.likes}
+                                    </sl-button>
+                                    <sl-button variant="text" size="small" 
+                                        onclick="window.toggleComments('${tweetId}')">
+                                        <sl-icon name="chat"></sl-icon> ${tweet.commentCount || 0}
                                     </sl-button>
                                 </div>
-                                <div id="commentList-${tweetId}"></div>
-                            </div>
-                    `;
-                    container.appendChild(tweetEl);
-                });
-        
-                loading = false;
-                document.getElementById('loading').style.display = 'none';
-            }, {
-                onlyOnce: true  // 只监听一次
-            });
-        
-            snapshot.forEach(childSnapshot => {
-                const tweet = childSnapshot.val();
-                const tweetId = childSnapshot.key; // 获取正确的推文ID
-                
-                const tweetEl = document.createElement('div');
-                tweetEl.className = 'tweet-card';
-                tweetEl.innerHTML = `
-
-                `;
-                container.prepend(tweetEl);
-    
-                // 监听评论变化
-                const commentsRef = ref(db, `tweets/${tweetId}/comments`);
-                onValue(commentsRef, (commentSnapshot) => {
-                    const container = document.getElementById(`commentList-${tweetId}`);
-                    container.innerHTML = '';
-                    
-                    commentSnapshot.forEach(commentChild => {
-                        const comment = commentChild.val();
-                        const div = document.createElement('div');
-                        div.className = 'comment-card';
-                        div.innerHTML = `
-                            <div style="font-size: 0.9rem; color: #2d3436;">
-                                <strong>${comment.author || 'Futalk用户'}</strong>
-                                <span style="color: #636e72; font-size: 0.8rem;">
-                                    ${new Date(comment.createdAt).toLocaleString()}
-                                </span>
-                            </div>
-                            <div style="margin-top: 0.5rem;">${comment.content}</div>
+                                <div id="comments-${tweetId}" class="comment-section" style="display: none;">
+                                    <div class="comment-input">
+                                        <sl-input id="commentInput-${tweetId}" 
+                                            placeholder="写下你的评论..." 
+                                            style="flex:1;"></sl-input>
+                                        <sl-button variant="primary" 
+                                            size="small" 
+                                            onclick="window.postComment('${tweetId}')">
+                                            评论
+                                        </sl-button>
+                                    </div>
+                                    <div id="commentList-${tweetId}"></div>
+                                </div>
                         `;
-                        container.appendChild(div);
+                        container.appendChild(tweetEl);
+                    });
+            
+                    loading = false;
+                    document.getElementById('loading').style.display = 'none';
+                }, {
+                    onlyOnce: true  // 只监听一次
+                });
+            
+                snapshot.forEach(childSnapshot => {
+                    // 监听评论变化
+                    const commentsRef = ref(db, `tweets/${tweetId}/comments`);
+                    onValue(commentsRef, (commentSnapshot) => {
+                        const container = document.getElementById(`commentList-${tweetId}`);
+                        container.innerHTML = '';
+                        
+                        commentSnapshot.forEach(commentChild => {
+                            const comment = commentChild.val();
+                            const div = document.createElement('div');
+                            div.className = 'comment-card';
+                            div.innerHTML = `
+                                <div style="font-size: 0.9rem; color: #2d3436;">
+                                    <strong>${comment.author || 'Futalk用户'}</strong>
+                                    <span style="color: #636e72; font-size: 0.8rem;">
+                                        ${new Date(comment.createdAt).toLocaleString()}
+                                    </span>
+                                </div>
+                                <div style="margin-top: 0.5rem;">${comment.content}</div>
+                            `;
+                            container.appendChild(div);
+                        });
                     });
                 });
-            });
-        });
+            };
         // 初始化加载
         loadTweets(true);
         
