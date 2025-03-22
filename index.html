@@ -296,7 +296,8 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
         import { 
             getDatabase, ref, push, onValue, 
-            query, orderByChild, update, get  // 添加get方法
+            query, orderByChild, update, get
+            ,limitToLast, endBefore, startAfter// 添加get方法
         } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
 
         const firebaseConfig = {
