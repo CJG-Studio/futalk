@@ -321,6 +321,8 @@
         let lastTweetTimestamp = null; // 分页标记
         let isLoading = false;     // 加载状态锁
         let hasMore = true;        // 是否还有更多数据
+        let lastTweetKey = null;    // 分页标记
+        let initialLoad = true;    // 是否是首次加载
         
         // 显示资源中心
         window.showResources = function() {
@@ -524,37 +526,50 @@
                 console.error("评论失败:", error);
             }
         }
-        // 修改后的分页加载逻辑
-        async function loadTweets(initialLoad = false) {
+        
+        async function loadTweets() {
             if (isLoading || !hasMore) return;
             isLoading = true;
             document.getElementById('loadingIndicator').style.display = 'block';
-        
+
             try {
                 let queryRef = query(tweetsRef, orderByChild('createdAt'));
                 
+                // 分页逻辑
                 if (!initialLoad && lastTweetKey) {
-                    queryRef = query(queryRef, endBefore(lastTweetKey));
+                    queryRef = query(queryRef, endAt(lastTweetKey));
+                    queryRef = query(queryRef, limitToLast(6));
+                } else {
+                    queryRef = query(queryRef, limitToLast(6));
                 }
-                queryRef = query(queryRef, limitToLast(6));
-        
+
                 const snapshot = await get(queryRef);
                 if (!snapshot.exists() || snapshot.numChildren() === 0) {
                     hasMore = false;
                     return;
                 }
-        
+
                 const tweets = [];
+                let newLastKey = null;
                 snapshot.forEach(child => {
                     const tweet = child.val();
                     tweet.id = child.key;
                     tweets.push(tweet);
-                    lastTweetKey = tweet.createdAt; // 使用时间戳作为分页标记
+                    newLastKey = tweet.createdAt; // 使用时间戳作为分页标记
                 });
-        
+
+                // 更新分页标记
+                if (newLastKey && newLastKey !== lastTweetKey) {
+                    lastTweetKey = newLastKey;
+                } else {
+                    hasMore = false;
+                }
+
                 // 按时间倒序显示
                 tweets.sort((a, b) => b.createdAt - a.createdAt);
                 renderTweets(tweets, initialLoad);
+                
+                if (initialLoad) initialLoad = false;
                 hasMore = tweets.length >= 6;
             } catch (error) {
                 console.error("加载推文失败:", error);
@@ -611,10 +626,14 @@
         // 滚动事件监听
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
-                if (entry.isIntersecting && hasMore) {
+                if (entry.isIntersecting && hasMore && !isLoading) {
                     loadTweets();
                 }
             });
+        }, {
+            root: null,
+            rootMargin: '200px',
+            threshold: 0.1
         });
         observer.observe(document.querySelector('.scroll-observer'));
 
