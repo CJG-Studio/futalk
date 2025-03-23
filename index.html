@@ -524,40 +524,41 @@
                 console.error("评论失败:", error);
             }
         }
-        // 分页加载推文
-        async function loadTweets() {
+        // 修改后的分页加载逻辑
+        async function loadTweets(initialLoad = false) {
             if (isLoading || !hasMore) return;
             isLoading = true;
             document.getElementById('loadingIndicator').style.display = 'block';
-
+        
             try {
                 let queryRef = query(tweetsRef, orderByChild('createdAt'));
-                if (lastTweetTimestamp) {
-                    queryRef = query(queryRef, endBefore(lastTweetTimestamp));
+                
+                if (!initialLoad && lastTweetKey) {
+                    queryRef = query(queryRef, endBefore(lastTweetKey));
                 }
                 queryRef = query(queryRef, limitToLast(6));
-
+        
                 const snapshot = await get(queryRef);
-                if (!snapshot.exists()) {
+                if (!snapshot.exists() || snapshot.numChildren() === 0) {
                     hasMore = false;
                     return;
                 }
-
+        
                 const tweets = [];
                 snapshot.forEach(child => {
                     const tweet = child.val();
                     tweet.id = child.key;
                     tweets.push(tweet);
-                    // 更新最后的时间戳
-                    if (!lastTweetTimestamp || tweet.createdAt < lastTweetTimestamp) {
-                        lastTweetTimestamp = tweet.createdAt;
-                    }
+                    lastTweetKey = tweet.createdAt; // 使用时间戳作为分页标记
                 });
-
+        
                 // 按时间倒序显示
                 tweets.sort((a, b) => b.createdAt - a.createdAt);
-                renderTweets(tweets);
-                hasMore = tweets.length === 6;
+                renderTweets(tweets, initialLoad);
+                hasMore = tweets.length >= 6;
+            } catch (error) {
+                console.error("加载推文失败:", error);
+                alert("加载推文失败，请检查控制台");
             } finally {
                 isLoading = false;
                 document.getElementById('loadingIndicator').style.display = 'none';
