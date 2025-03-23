@@ -295,9 +295,8 @@
         import { increment } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
         import { 
-            getDatabase, ref, push, onValue, 
-            query, orderByChild, update, get
-            ,limitToLast, endBefore, startAfter// 添加get方法
+            getDatabase, ref, push, onValue, query, 
+            orderByChild, limitToLast, endAt, get 
         } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
 
         const firebaseConfig = {
@@ -527,6 +526,7 @@
             }
         }
         
+        // 修复后的加载函数
         async function loadTweets() {
             if (isLoading || !hasMore) return;
             isLoading = true;
@@ -535,13 +535,10 @@
             try {
                 let queryRef = query(tweetsRef, orderByChild('createdAt'));
                 
-                // 分页逻辑
-                if (!initialLoad && lastTweetKey) {
-                    queryRef = query(queryRef, endAt(lastTweetKey));
-                    queryRef = query(queryRef, limitToLast(6));
-                } else {
-                    queryRef = query(queryRef, limitToLast(6));
+                if (lastTweetTimestamp) {
+                    queryRef = query(queryRef, endAt(lastTweetTimestamp));
                 }
+                queryRef = query(queryRef, limitToLast(6));
 
                 const snapshot = await get(queryRef);
                 if (!snapshot.exists() || snapshot.numChildren() === 0) {
@@ -550,52 +547,43 @@
                 }
 
                 const tweets = [];
-                let newLastKey = null;
+                let newTimestamp = null;
                 snapshot.forEach(child => {
                     const tweet = child.val();
                     tweet.id = child.key;
                     tweets.push(tweet);
-                    newLastKey = tweet.createdAt; // 使用时间戳作为分页标记
+                    newTimestamp = tweet.createdAt;
                 });
 
-                // 更新分页标记
-                if (newLastKey && newLastKey !== lastTweetKey) {
-                    lastTweetKey = newLastKey;
-                } else {
+                if (newTimestamp === lastTweetTimestamp) {
                     hasMore = false;
+                } else {
+                    lastTweetTimestamp = newTimestamp;
+                    renderTweets(tweets);
                 }
-
-                // 按时间倒序显示
-                tweets.sort((a, b) => b.createdAt - a.createdAt);
-                renderTweets(tweets, initialLoad);
-                
-                if (initialLoad) initialLoad = false;
-                hasMore = tweets.length >= 6;
             } catch (error) {
-                console.error("加载推文失败:", error);
-                alert("加载推文失败，请检查控制台");
+                console.error("加载错误:", error);
             } finally {
                 isLoading = false;
                 document.getElementById('loadingIndicator').style.display = 'none';
             }
         }
-
-        // 渲染推文
+        // 渲染函数
         function renderTweets(tweets) {
             const container = document.getElementById('tweetsContainer');
-            tweets.forEach(tweet => {
-                if (document.getElementById(`tweet-${tweet.id}`)) return;
+            tweets.sort((a, b) => b.createdAt - a.createdAt).forEach(tweet => {
+                const existing = document.getElementById(`tweet-${tweet.id}`);
+                if (existing) return;
 
                 const tweetEl = document.createElement('div');
                 tweetEl.className = 'tweet-card';
                 tweetEl.id = `tweet-${tweet.id}`;
                 tweetEl.innerHTML = `
-                    <div style="color: #657786; font-size: 14px;">
-                        ${new Date(tweet.createdAt).toLocaleString()}
+                    <div class="tweet-header">
+                        <span>${new Date(tweet.createdAt).toLocaleString()}</span>
                     </div>
-                    <div class="tweet-content">${tweet.content || ''}</div>
                     ${tweet.image ? `<img src="${tweet.image}" class="image-preview">` : ''}
-                    <div class="tweet-content">${tweet.content}</div>
+                    ${tweet.content ? `<div class="tweet-content">${tweet.content}</div>` : ''}
                     <div style="display: flex; gap: 24px; color: #657786;">
                         <sl-button variant="text" size="small" 
                             onclick="window.handleLike('${tweetId}', ${tweet.likes})">
@@ -623,23 +611,20 @@
                 container.appendChild(tweetEl);
             });
         }
-        // 滚动事件监听
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting && hasMore && !isLoading) {
-                    loadTweets();
-                }
-            });
-        }, {
-            root: null,
-            rootMargin: '200px',
-            threshold: 0.1
-        });
-        observer.observe(document.querySelector('.scroll-observer'));
 
         // 初始化加载
         loadTweets();
-
+        
+        // 滚动加载
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting && hasMore) {
+                    loadTweets();
+                }
+            });
+        }, { threshold: 0.1 });
+        observer.observe(document.querySelector('.scroll-observer'));
+        
         // 点击遮罩层关闭
         document.getElementById('overlay').addEventListener('click', closeCompose);
         // 图片上传处理
