@@ -182,7 +182,27 @@
             margin: 1rem 0;
             white-space: pre-wrap;
         }
-
+ 
+        .comment-section {
+          display: none; /* 默认隐藏评论区域 */
+          transition: all 0.3s ease;
+        }
+        
+        .comment-section[data-visible] {
+          display: block;
+        }
+        
+        #loadingIndicator {
+          position: fixed;
+          bottom: 40px;
+          right: 20px;
+          background: rgba(0,0,0,0.8);
+          color: white;
+          padding: 8px 16px;
+          border-radius: 20px;
+          z-index: 1000;
+        }
+        
         .char-counter {
             text-align: right;
             color: #657786;
@@ -494,12 +514,39 @@
 
                 // 新增评论功能逻辑
         window.toggleComments = function(tweetId) {
-            const section = document.getElementById(`comments-${tweetId}`);
+          const section = document.getElementById(`comments-${tweetId}`);
+          if (!section) {
+            console.warn(`找不到评论区域: ${tweetId}`);
+            return;
+          }
+          
+          // 安全访问style属性
+          if (section && section.style) {
             section.style.display = section.style.display === 'none' ? 'block' : 'none';
+          }
+        };
+        // 添加评论输入框的渲染函数
+        function renderCommentInput(tweetId) {
+          return `
+            <div class="comment-input">
+              <sl-input id="commentInput-${tweetId}" 
+                        placeholder="写下你的评论..."
+                        style="flex:1;"></sl-input>
+              <sl-button variant="primary" 
+                        size="small" 
+                        onclick="window.postComment('${tweetId}')">
+                评论
+              </sl-button>
+            </div>
+          `;
         }
-
+        
         window.postComment = async function(tweetId) {
             const input = document.getElementById(`commentInput-${tweetId}`);
+            if (!input) {
+                console.error('找不到评论输入框:', tweetId);
+                return;
+            }
             const content = input.value.trim();
             
             if (!content) {
@@ -604,6 +651,11 @@
                                  onclick="toggleComments('${tweet.id}')">
                             <sl-icon name="chat"></sl-icon> ${tweet.commentCount || 0}
                         </sl-button>
+                        <div id="comments-${tweet.id}" 
+                           class="comment-section" 
+                           style="display: none;">
+                        ${renderCommentInput(tweet.id)}
+                        <div id="commentList-${tweet.id}"></div>
                     </div>
                 `;
                 container.appendChild(tweetEl);
