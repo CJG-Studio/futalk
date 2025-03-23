@@ -531,7 +531,7 @@
             if (isLoading || !hasMore) return;
             isLoading = true;
             document.getElementById('loadingIndicator').style.display = 'block';
-
+    
             try {
                 let queryRef = query(tweetsRef, orderByChild('createdAt'));
                 
@@ -539,27 +539,39 @@
                     queryRef = query(queryRef, endAt(lastTweetTimestamp));
                 }
                 queryRef = query(queryRef, limitToLast(6));
-
+    
                 const snapshot = await get(queryRef);
-                if (!snapshot.exists() || snapshot.numChildren() === 0) {
+                
+                // 修复检查方式
+                if (!snapshot.exists()) {
                     hasMore = false;
                     return;
                 }
-
+                
+                // 新方法检查数据量
+                const tweetCount = Object.keys(snapshot.val()).length;
+                if (tweetCount === 0) {
+                    hasMore = false;
+                    return;
+                }
+    
                 const tweets = [];
                 let newTimestamp = null;
                 snapshot.forEach(child => {
-                    const tweet = child.val();
-                    tweet.id = child.key;
-                    tweets.push(tweet);
+                    const tweet = {
+                        ...child.val(),
+                        id: child.key
+                    };
                     newTimestamp = tweet.createdAt;
+                    tweets.push(tweet);
                 });
-
+    
                 if (newTimestamp === lastTweetTimestamp) {
                     hasMore = false;
                 } else {
                     lastTweetTimestamp = newTimestamp;
                     renderTweets(tweets);
+                    hasMore = tweetCount >= 6;
                 }
             } catch (error) {
                 console.error("加载错误:", error);
@@ -568,44 +580,30 @@
                 document.getElementById('loadingIndicator').style.display = 'none';
             }
         }
-        // 渲染函数
+        // 修改后的渲染函数
         function renderTweets(tweets) {
             const container = document.getElementById('tweetsContainer');
             tweets.sort((a, b) => b.createdAt - a.createdAt).forEach(tweet => {
-                const existing = document.getElementById(`tweet-${tweet.id}`);
-                if (existing) return;
-
+                if (document.getElementById(`tweet-${tweet.id}`)) return;
+    
                 const tweetEl = document.createElement('div');
                 tweetEl.className = 'tweet-card';
                 tweetEl.id = `tweet-${tweet.id}`;
                 tweetEl.innerHTML = `
-                    <div class="tweet-header">
-                        <span>${new Date(tweet.createdAt).toLocaleString()}</span>
+                    <div class="tweet-time">
+                        ${new Date(tweet.createdAt).toLocaleString()}
                     </div>
-                    ${tweet.image ? `<img src="${tweet.image}" class="image-preview">` : ''}
                     ${tweet.content ? `<div class="tweet-content">${tweet.content}</div>` : ''}
-                    <div style="display: flex; gap: 24px; color: #657786;">
+                    ${tweet.image ? `<img src="${tweet.image}" class="image-preview">` : ''}
+                    <div class="tweet-actions">
                         <sl-button variant="text" size="small" 
-                            onclick="window.handleLike('${tweetId}', ${tweet.likes})">
+                                 onclick="handleLike('${tweet.id}', ${tweet.likes})">
                             <sl-icon name="heart"></sl-icon> ${tweet.likes}
                         </sl-button>
                         <sl-button variant="text" size="small" 
-                            onclick="window.toggleComments('${tweetId}')">
+                                 onclick="toggleComments('${tweet.id}')">
                             <sl-icon name="chat"></sl-icon> ${tweet.commentCount || 0}
                         </sl-button>
-                    </div>
-                    <div id="comments-${tweetId}" class="comment-section" style="display: none;">
-                        <div class="comment-input">
-                            <sl-input id="commentInput-${tweetId}" 
-                                placeholder="写下你的评论..." 
-                                style="flex:1;"></sl-input>
-                            <sl-button variant="primary" 
-                                size="small" 
-                                onclick="window.postComment('${tweetId}')">
-                                评论
-                            </sl-button>
-                        </div>
-                        <div id="commentList-${tweetId}"></div>
                     </div>
                 `;
                 container.appendChild(tweetEl);
