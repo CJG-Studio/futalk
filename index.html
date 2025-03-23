@@ -296,7 +296,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
         import { 
             getDatabase, ref, push, onValue, query, 
-            orderByChild, limitToLast, endAt, get 
+            orderByChild, limitToLast, endAt, get, update
         } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
 
         const firebaseConfig = {
@@ -631,8 +631,8 @@
             if (!file) return;
 
             // 大小检查
-            if (file.size > 600 * 1024) {
-                alert("图片大小不能超过600KB");
+            if (file.size > 500 * 1024) {
+                alert("图片大小不能超过500KB");
                 return;
             }
 
